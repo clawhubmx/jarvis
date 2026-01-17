@@ -38,6 +38,9 @@ pub mod voices;
 
 pub mod audio_buffer;
 
+#[cfg(feature = "lua")]
+pub mod lua;
+
 // shared statics
 // pub static APP_DIR: Lazy<PathBuf> = Lazy::new(|| std::env::current_dir().unwrap());
 pub static APP_DIR: Lazy<PathBuf> = Lazy::new(|| {

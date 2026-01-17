@@ -1,0 +1,14 @@
+[[commands]]
+id = "hello"
+type = "lua"
+script = "script.lua"
+sandbox = "minimal"
+timeout = 5000
+phrases.ru = [
+    "привет",
+    "здравствуй",
+]
+phrases.en = [
+    "hello",
+    "hi",
+]

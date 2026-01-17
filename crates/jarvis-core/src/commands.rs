@@ -10,6 +10,8 @@ pub use structs::*;
 
 use crate::{config, i18n, APP_DIR};
 
+#[cfg(feature = "lua")]
+use crate::lua::{self, SandboxLevel, CommandContext};
 
 pub fn parse_commands() -> Result<Vec<JCommandsList>, String> {
     let mut commands: Vec<JCommandsList> = Vec::new();
@@ -189,10 +191,20 @@ pub fn execute_cli(cmd: &str, args: &[String]) -> std::io::Result<Child> {
     }
 }
 
-pub fn execute_command(cmd_path: &Path, cmd_config: &JCommand) -> Result<bool, String> {
-    match cmd_config.action.as_str() {
+pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option<&str>) -> Result<bool, String> {
+    match cmd_config.cmd_type.as_str() {
+
+        // BRUH
         "voice" => Ok(true),
         
+        // LUA command
+        #[cfg(feature = "lua")]
+        "lua" => {
+            execute_lua_command(cmd_path, cmd_config, phrase)
+        }
+
+        // AutoHotkey command
+        // @TODO: Consider adding ahk source files execution?
         "ahk" => {
             let exe_path_absolute = Path::new(&cmd_config.exe_path);
             let exe_path_local = cmd_path.join(&cmd_config.exe_path);
@@ -208,23 +220,80 @@ pub fn execute_command(cmd_path: &Path, cmd_config: &JCommand) -> Result<bool, S
                 .map_err(|e| format!("AHK process spawn error: {}", e))
         }
         
+        // CLI command type
+        // @TODO: Consider security restrictions
         "cli" => {
             execute_cli(&cmd_config.cli_cmd, &cmd_config.cli_args)
                 .map(|_| true)
                 .map_err(|e| format!("CLI command error: {}", e))
         }
         
+        // TERMINATOR command (T1000)
         "terminate" => {
             std::thread::sleep(Duration::from_secs(2));
             std::process::exit(0);
         }
         
+        // STOP CHANING
         "stop_chaining" => Ok(false),
-        
-        _ => Err(format!("Unknown command type: {}", cmd_config.action)),
+
+        // other
+        _ => {
+            error!("Command type unknown: {}", cmd_config.cmd_type);
+            Err(format!("Command type unknown: {}", cmd_config.cmd_type).into())
+        }
     }
 }
 
 pub fn list_paths(commands: &[JCommandsList]) -> Vec<&Path> {
     commands.iter().map(|x| x.path.as_path()).collect()
+}
+
+#[cfg(feature = "lua")]
+fn execute_lua_command(
+    cmd_path: &PathBuf,
+    cmd_config: &JCommand,
+    phrase: Option<&str>,
+) -> Result<bool, String> {
+    // get script path
+    let script_name = if cmd_config.script.is_empty() {
+        "script.lua"
+    } else {
+        &cmd_config.script
+    };
+    
+    let script_path = cmd_path.join(script_name);
+    
+    if !script_path.exists() {
+        return Err(format!("Lua script not found: {}", script_path.display()));
+    }
+    
+    // parse sandbox level
+    let sandbox = SandboxLevel::from_str(&cmd_config.sandbox);
+    
+    // create context
+    let context = CommandContext {
+        phrase: phrase.unwrap_or("").to_string(),
+        command_id: cmd_config.id.clone(),
+        command_path: cmd_path.clone(),
+        language: i18n::get_language(),
+    };
+    
+    // get timeout
+    let timeout = Duration::from_millis(cmd_config.timeout);
+    
+    info!("Executing Lua command: {} (sandbox: {:?}, timeout: {:?})", 
+          cmd_config.id, sandbox, timeout);
+    
+    // execute
+    match lua::execute(&script_path, context, sandbox, timeout) {
+        Ok(result) => {
+            info!("Lua command {} completed (chain: {})", cmd_config.id, result.chain);
+            Ok(result.chain)
+        }
+        Err(e) => {
+            error!("Lua command {} failed: {}", cmd_config.id, e);
+            Err(e.to_string())
+        }
+    }
 }

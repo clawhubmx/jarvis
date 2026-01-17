@@ -7,7 +7,8 @@ use parking_lot::RwLock;
 
 use crate::{DB, SOUND_DIR, audio, config, time};
 
-pub mod structs;
+mod structs;
+pub use structs::*;
 
 static VOICES: OnceCell<Vec<structs::VoiceConfig>> = OnceCell::new();
 static CURRENT_VOICE_ID: OnceCell<RwLock<String>> = OnceCell::new();

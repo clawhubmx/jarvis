@@ -6,6 +6,7 @@
 import os
 from pathlib import Path
 import shutil
+import sys
 
 # some config vars
 # format: (source, destination_name)
@@ -30,6 +31,9 @@ TARGET_DIRS = (
 
 ABS_PATH = os.getcwd() + "/"
 
+# check for force flag
+force_overwrite = "-force" in sys.argv
+
 for tdir in TARGET_DIRS:
     tdir = ABS_PATH + tdir
 
@@ -52,7 +56,12 @@ for tdir in TARGET_DIRS:
             full_target_dir_path = os.path.join(tdir, target_name)
             
             if os.path.isdir(full_target_dir_path):
-                print("[-] Directory already exists, skipping: ", src, "->", target_name)
+                if force_overwrite:
+                    shutil.rmtree(full_target_dir_path)
+                    shutil.copytree(src_path, full_target_dir_path)
+                    print("[+] Directory overwritten: ", src, "->", target_name)
+                else:
+                    print("[-] Directory already exists, skipping: ", src, "->", target_name)
             else:
                 shutil.copytree(src_path, full_target_dir_path)
                 print("[+] Directory copied: ", src, "->", target_name)
@@ -63,7 +72,12 @@ for tdir in TARGET_DIRS:
             full_target_file_path = os.path.join(tdir, target_name)
             
             if os.path.isfile(full_target_file_path):
-                print("[-] File already exists, skipping: ", src, "->", target_name)
+                if force_overwrite:
+                    os.remove(full_target_file_path)
+                    shutil.copy(src_path, full_target_file_path)
+                    print("[+] File overwritten: ", src, "->", target_name)
+                else:
+                    print("[-] File already exists, skipping: ", src, "->", target_name)
             else:
                 shutil.copy(src_path, full_target_file_path)
                 print("[+] File copied: ", src, "->", target_name)

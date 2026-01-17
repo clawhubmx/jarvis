@@ -306,7 +306,7 @@ fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
     if let Some((cmd_path, cmd_config)) = cmd_result {
         info!("Command found: {:?}", cmd_path);
         
-        match commands::execute_command(&cmd_path, &cmd_config) {
+        match commands::execute_command(&cmd_path, &cmd_config, Some(&text)) {
             Ok(chain) => {
                 info!("Command executed successfully");
                 // voices::play_ok();

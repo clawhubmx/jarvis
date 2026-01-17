@@ -1,7 +1,9 @@
 [[commands]]
 id = "weather"
-action = "cli"
-cli_cmd = "weather.py"
+type = "lua"
+script = "script.lua"
+timeout = 5000
+sandbox = "standard"
 
 [commands.phrases]
 ru = [
@@ -16,3 +18,17 @@ en = [
 [commands.sounds]
 ru = ["weather_ru_1", "weather_ru_2"]
 en = ["weather_en_1", "weather_en_2"]
+
+
+
+[[commands]]
+id = "set_city"
+type = "lua"
+script = "set_city.lua"
+sandbox = "standard"
+timeout = 5000
+phrases = [
+    "установи город",
+    "set city",
+    "change city",
+]

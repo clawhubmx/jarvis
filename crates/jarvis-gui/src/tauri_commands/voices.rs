@@ -1,4 +1,4 @@
-use jarvis_core::voices::{self, structs::VoiceConfig};
+use jarvis_core::voices::{self, VoiceConfig};
 
 #[tauri::command]
 pub fn list_voices() -> Vec<VoiceConfig> {

@@ -175,6 +175,9 @@ pub const GAIN_MAX: f32 = 3.0;  // maximum gain multiplier
 // nnnoiseless frame size (fixed by library)
 pub const NNNOISELESS_FRAME_SIZE: usize = 480;
 
+// LUA
+pub const DEFAULT_LUA_SANDBOX: &str = "standard";
+pub const DEFAULT_LUA_TIMEOUT: u64 = 10000; // ms
 
 // ETC
 pub const CMD_RATIO_THRESHOLD: f64 = 65f64;

@@ -15,25 +15,41 @@ pub struct JCommandsList {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct JCommand {
     pub id: String,
-    pub action: String,
+
+    // Available command types are: "lua", "ahk", "cli", "voice", "terminate", "stop_chaining"
+    #[serde(rename = "type")]
+    pub cmd_type: String,
     
     #[serde(default)]
     pub description: String,
     
+    // for "ahk" type
     #[serde(default)]
     pub exe_path: String,
-    
     #[serde(default)]
     pub exe_args: Vec<String>,
     
+    // for "cli" type
     #[serde(default)]
     pub cli_cmd: String,
-    
     #[serde(default)]
     pub cli_args: Vec<String>,
     
     // #[serde(default)]
     // pub sounds: Vec<String>,
+
+    // for "lua" type
+    #[serde(default)]
+    pub script: String,
+
+    // Lua sandbox level: "minimal", "standard", "full"
+    // basically this is an access level
+    #[serde(default)]
+    pub sandbox: String,
+
+    // Script timeout in milliseconds (default 10000 = 10s)
+    #[serde(default)]
+    pub timeout: u64,
 
     // Multi-language sounds
     #[serde(default)]
@@ -57,12 +73,20 @@ impl Clone for JCommand {
     fn clone(&self) -> Self {
         Self {
             id: self.id.clone(),
-            action: self.action.clone(),
+
+            cmd_type: self.cmd_type.clone(),
             description: self.description.clone(),
+
             exe_path: self.exe_path.clone(),
             exe_args: self.exe_args.clone(),
+
             cli_cmd: self.cli_cmd.clone(),
             cli_args: self.cli_args.clone(),
+
+            script: self.script.clone(),
+            sandbox: self.sandbox.clone(),
+            timeout: self.timeout.clone(),
+
             sounds: self.sounds.clone(),
             phrases: self.phrases.clone(),
 
