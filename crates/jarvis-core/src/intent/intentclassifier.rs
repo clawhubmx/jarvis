@@ -62,6 +62,28 @@ pub async fn classify(text: &str) -> Result<IntentPrediction, IntentError> {
     model.classifier.predict_intent(text).await
 }
 
+/// Re-train from disk after `commands` list was replaced (clears prior training, keeps bootstrap).
+pub async fn reload_training(commands: &[JCommandsList]) -> Result<(), String> {
+    let model = MODEL.get().ok_or("IntentClassifier not initialized")?;
+    model
+        .classifier
+        .clear_training_data()
+        .await
+        .map_err(|e: IntentError| e.to_string())?;
+    train_classifier(&model.classifier, commands).await?;
+
+    let config_dir = APP_CONFIG_DIR.get().ok_or("Config dir not set")?;
+    let hash_path = config_dir.join(COMMANDS_HASH_FILE);
+    let cache_path = config_dir.join(TRAINING_CACHE_FILE);
+    let current_hash = commands::commands_hash(commands);
+    if let Ok(export) = model.classifier.export_training_data().await {
+        let _ = fs::write(&cache_path, export);
+        let _ = fs::write(&hash_path, &current_hash);
+        info!("Intent training cache updated after reload.");
+    }
+    Ok(())
+}
+
 async fn train_classifier(
     classifier: &intent_classifier::IntentClassifier,
     commands: &[JCommandsList]

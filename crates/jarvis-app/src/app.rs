@@ -60,6 +60,15 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
             continue 'wake_word;
         }
 
+        if crate::is_mic_muted() {
+            recorder::read_microphone(&mut frame_buffer);
+            let _ = audio_processing::process(&frame_buffer);
+            vad_state = VadState::WaitingForVoice;
+            silence_frames = 0;
+            audio_buffer.clear();
+            continue 'wake_word;
+        }
+
         recorder::read_microphone(&mut frame_buffer);
         let processed = audio_processing::process(&frame_buffer);
         
@@ -166,6 +175,11 @@ fn recognize_command(
     
     loop {
         if crate::should_stop() {
+            return;
+        }
+
+        if crate::is_mic_muted() {
+            ipc::send(IpcEvent::Idle);
             return;
         }
         
@@ -342,23 +356,23 @@ fn process_text_command(text: &str, rt: &tokio::runtime::Runtime) {
 
 // Execute command, returns true if chaining should continue
 fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
-    let commands_list = match COMMANDS_LIST.get() {
-        Some(c) => c,
-        None => {
-            ipc::send(IpcEvent::Error { message: "Commands not loaded".to_string() });
-            ipc::send(IpcEvent::Idle);
-            return false;
-        }
-    };
-    
-    let cmd_result = if let Some((intent_id, confidence)) = 
-        rt.block_on(intent::classify(text)) 
+    let commands_list = COMMANDS_LIST.read();
+    if commands_list.is_empty() {
+        ipc::send(IpcEvent::Error {
+            message: "Commands not loaded".to_string(),
+        });
+        ipc::send(IpcEvent::Idle);
+        return false;
+    }
+
+    let cmd_result = if let Some((intent_id, confidence)) =
+        rt.block_on(intent::classify(text))
     {
         info!("Intent recognized: {} (confidence: {:.2})", intent_id, confidence);
-        intent::get_command_by_intent(commands_list, &intent_id)
+        intent::get_command_by_intent(&commands_list, &intent_id)
     } else {
         info!("Intent not recognized, trying levenshtein fallback...");
-        commands::fetch_command(text, commands_list)
+        commands::fetch_command(text, &commands_list)
     };
     
     if let Some((cmd_path, cmd_config)) = cmd_result {

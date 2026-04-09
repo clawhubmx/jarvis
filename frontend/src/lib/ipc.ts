@@ -1,3 +1,4 @@
+// WebSocket payloads: keep `action` / `event` tags in sync with `crates/jarvis-core/src/ipc/events.rs`.
 import { writable, get } from "svelte/store"
 import { invoke } from "@tauri-apps/api/core"
 import { getCurrentWindow } from "@tauri-apps/api/window"
@@ -11,6 +12,8 @@ export const ipcConnected = writable(false)
 export const lastRecognizedText = writable("")
 export const lastExecutedCommand = writable("")
 export const lastError = writable("")
+/** Reflects assistant mic mute (wake + voice path); synced from `mic_muted` IPC events. */
+export const micMuted = writable(false)
 
 // ### CONNECTION ###
 
@@ -133,6 +136,14 @@ function handleEvent(data: any) {
             // bring window to foreground
             revealWindow()
             break
+
+        case "mic_muted":
+            micMuted.set(!!data.muted)
+            break
+
+        case "commands_reloaded":
+            console.log("[IPC] commands reloaded:", data.command_packs, "pack(s)")
+            break
     }
 }
 
@@ -153,6 +164,10 @@ export function stopJarvisApp() {
 
 export function reloadCommands() {
     return sendAction("reload_commands")
+}
+
+export function setMuted(muted: boolean) {
+    return sendAction("set_muted", { muted })
 }
 
 export function sendIpcMessage(message: object): Promise<void> {

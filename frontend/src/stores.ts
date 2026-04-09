@@ -8,6 +8,7 @@ export {
     lastRecognizedText,
     lastExecutedCommand,
     lastError,
+    micMuted,
     connectIpc,
     enableIpc,
     disableIpc,
@@ -16,7 +17,8 @@ export {
     sendIpcMessage,
     sendTextCommand,
     stopJarvisApp,
-    reloadCommands
+    reloadCommands,
+    setMuted
 } from "./lib/ipc"
 
 // re-export i18n

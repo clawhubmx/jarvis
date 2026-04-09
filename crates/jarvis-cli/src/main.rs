@@ -12,6 +12,7 @@ Commands:
   list               - List all loaded commands
   phrases            - List all training phrases
   hash               - Show commands hash
+  reload             - Reload commands from disk and refresh intent training
   settings           - Dump all settings
   help               - Show this help
   exit               - Exit the CLI
@@ -121,15 +122,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Vec::new()
         }
     };
-    COMMANDS_LIST.set(cmds).expect("Failed to set commands list");
-    
+    *COMMANDS_LIST.write() = cmds;
+
     // init intent classifier
     println!("[*] Initializing intent classifier...");
-    match intent::init(COMMANDS_LIST.get().unwrap()).await {
+    let init_guard = COMMANDS_LIST.read();
+    match intent::init(&*init_guard).await {
         Ok(_) => println!("    Intent classifier ready"),
         Err(e) => println!("    Warning: {}", e),
     }
-    
+    drop(init_guard);
+
     // init sound
     println!("[*] Initializing audio...");
     if let Err(e) = jarvis_core::audio::init() {
@@ -162,10 +165,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 break;
             }
             "help" | "h" | "?" => print_help(),
-            "list" | "ls" => list_commands(COMMANDS_LIST.get().unwrap()),
-            "phrases" => list_phrases(COMMANDS_LIST.get().unwrap()),
+            "list" | "ls" => list_commands(&*COMMANDS_LIST.read()),
+            "phrases" => list_phrases(&*COMMANDS_LIST.read()),
             "hash" => {
-                let hash = commands::commands_hash(COMMANDS_LIST.get().unwrap());
+                let hash = commands::commands_hash(&*COMMANDS_LIST.read());
                 println!("  Commands hash: {}", hash);
             }
             "settings" => {
@@ -186,11 +189,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if arg.is_empty() {
                     println!("  Usage: execute <text>");
                 } else {
-                    execute_text(COMMANDS_LIST.get().unwrap(), arg).await;
+                    execute_text(&*COMMANDS_LIST.read(), arg).await;
                 }
             }
             "reload" => {
-                println!("  Note: Reload requires app restart (statics can't be reset)");
+                match commands::parse_commands() {
+                    Ok(cmds) => {
+                        let n = cmds.len();
+                        *COMMANDS_LIST.write() = cmds;
+                        let g = COMMANDS_LIST.read();
+                        match intent::reload(&*g).await {
+                            Ok(()) => println!("  Reloaded {} command pack(s), intent updated.", n),
+                            Err(e) => println!("  Commands updated but intent reload failed: {}", e),
+                        }
+                    }
+                    Err(e) => println!("  Reload failed: {}", e),
+                }
             }
             _ => {
                 // treat unknown commands as text to classify

@@ -2,16 +2,16 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::fs;
 
-use once_cell::sync::OnceCell;
+use once_cell::sync::Lazy;
+use parking_lot::RwLock;
 
 use crate::commands::JCommandsList;
 use crate::i18n;
 use crate::APP_CONFIG_DIR;
 use crate::models::embedding::EmbeddingModel;
 
-// no outer Mutex needed - state is immutable after init.
-// the embedding model has its own internal Mutex.
-static CLASSIFIER: OnceCell<EmbeddingClassifierState> = OnceCell::new();
+static CLASSIFIER: Lazy<RwLock<Option<EmbeddingClassifierState>>> =
+    Lazy::new(|| RwLock::new(None));
 
 struct IntentVector {
     id: String,
@@ -23,16 +23,13 @@ struct EmbeddingClassifierState {
     intents: Vec<IntentVector>,
 }
 
-// model is Arc (Send+Sync), intents are read-only after init
-unsafe impl Send for EmbeddingClassifierState {}
-unsafe impl Sync for EmbeddingClassifierState {}
-
 const CACHE_FILE: &str = "embedding_intents.json";
 const HASH_FILE: &str = "embedding_hash.txt";
 
 // init with a model loaded through the registry
 pub fn init_with_model(model: Arc<EmbeddingModel>, commands: &[JCommandsList]) -> Result<(), String> {
-    if CLASSIFIER.get().is_some() {
+    let mut guard = CLASSIFIER.write();
+    if guard.is_some() {
         return Ok(());
     }
 
@@ -70,8 +67,30 @@ pub fn init_with_model(model: Arc<EmbeddingModel>, commands: &[JCommandsList]) -
 
     info!("Embedding classifier ready with {} intents", intents.len());
 
-    CLASSIFIER.set(EmbeddingClassifierState { model, intents })
-        .map_err(|_| "Classifier already set".to_string())?;
+    *guard = Some(EmbeddingClassifierState { model, intents });
+
+    Ok(())
+}
+
+pub fn reload(commands: &[JCommandsList]) -> Result<(), String> {
+    let mut guard = CLASSIFIER.write();
+    let state = guard
+        .as_mut()
+        .ok_or("Embedding classifier not initialized")?;
+
+    info!("Rebuilding embedding intent vectors after command reload...");
+    let intents = build_intent_vectors(&state.model, commands)?;
+    state.intents = intents;
+
+    let current_hash = crate::commands::commands_hash(commands);
+    let config_dir = APP_CONFIG_DIR.get().ok_or("Config dir not set")?;
+    let hash_path = config_dir.join(HASH_FILE);
+    let cache_path = config_dir.join(CACHE_FILE);
+    if let Ok(json) = serde_json::to_string(&intents_to_cache(&state.intents)) {
+        let _ = fs::write(&cache_path, json);
+        let _ = fs::write(&hash_path, &current_hash);
+        info!("Embedding intent vectors cache updated.");
+    }
 
     Ok(())
 }
@@ -129,7 +148,8 @@ fn build_intent_vectors(
 }
 
 pub fn classify(text: &str) -> Result<(String, f64), String> {
-    let state = CLASSIFIER.get().ok_or("Classifier not initialized")?;
+    let guard = CLASSIFIER.read();
+    let state = guard.as_ref().ok_or("Classifier not initialized")?;
     
     // only the embedding model needs locking, intents are read-only
     let embeddings = state.model.embedding.lock().embed(vec![text], None)

@@ -6,7 +6,7 @@ use std::sync::mpsc;
 // include core
 use jarvis_core::{
     audio, audio_processing, commands, config, db, listener, recorder, stt, intent,
-    ipc::{self, IpcAction},
+    ipc::{self, IpcAction, IpcEvent},
     i18n, voices, models,
     APP_CONFIG_DIR, APP_LOG_DIR, COMMANDS_LIST, DB,
 };
@@ -25,6 +25,11 @@ mod app;
 mod tray;
 
 static SHOULD_STOP: AtomicBool = AtomicBool::new(false);
+static MIC_MUTED: AtomicBool = AtomicBool::new(false);
+
+pub fn is_mic_muted() -> bool {
+    MIC_MUTED.load(Ordering::SeqCst)
+}
 
 fn main() -> Result<(), String> {
     // initialize directories
@@ -81,7 +86,7 @@ fn main() -> Result<(), String> {
         }
     };
     info!("Commands initialized. Count: {}, List: {:?}", cmds.len(), commands::list_paths(&cmds));
-    COMMANDS_LIST.set(cmds).unwrap();
+    *COMMANDS_LIST.write() = cmds;
 
     // init audio
     if audio::init().is_err() {
@@ -101,12 +106,13 @@ fn main() -> Result<(), String> {
     );
 
     // init intent-recognition engine
-    rt.block_on(async {
-        if let Err(e) = intent::init(COMMANDS_LIST.get().unwrap()).await {
+    {
+        let guard = COMMANDS_LIST.read();
+        if let Err(e) = rt.block_on(intent::init(&*guard)) {
             error!("Failed to initialize intent classifier: {}", e);
             app::close(1);
         }
-    });
+    }
 
     // init slots parsing engine
     slots::init().map_err(|e| error!("Slot extraction init failed: {}", e)).ok();
@@ -124,6 +130,7 @@ fn main() -> Result<(), String> {
     // channel for text commands (manually written in the GUI)
     let (text_cmd_tx, text_cmd_rx) = mpsc::channel::<String>();
 
+    let rt_ipc = Arc::clone(&rt);
     ipc::set_action_handler(move |action| {
         match action {
             IpcAction::Stop => {
@@ -132,11 +139,38 @@ fn main() -> Result<(), String> {
             }
             IpcAction::ReloadCommands => {
                 info!("Received reload commands request");
-                // TODO: implement reload
+                match commands::parse_commands() {
+                    Ok(cmds) => {
+                        let n = cmds.len();
+                        *COMMANDS_LIST.write() = cmds;
+                        let guard = COMMANDS_LIST.read();
+                        match rt_ipc.block_on(intent::reload(&*guard)) {
+                            Ok(()) => {
+                                info!("Commands reloaded: {} pack(s)", n);
+                                ipc::send(IpcEvent::CommandsReloaded {
+                                    command_packs: n,
+                                });
+                            }
+                            Err(e) => {
+                                error!("Intent reload after command reload failed: {}", e);
+                                ipc::send(IpcEvent::Error {
+                                    message: format!("Reload commands (intent): {}", e),
+                                });
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Reload commands failed: {}", e);
+                        ipc::send(IpcEvent::Error {
+                            message: format!("Reload commands: {}", e),
+                        });
+                    }
+                }
             }
             IpcAction::SetMuted { muted } => {
                 info!("Received mute request: {}", muted);
-                // TODO: implement mute
+                MIC_MUTED.store(muted, Ordering::SeqCst);
+                ipc::send(IpcEvent::MicMuted { muted });
             }
             IpcAction::TextCommand { text } => {
                 info!("Received text command: {}", text);
@@ -163,7 +197,14 @@ fn main() -> Result<(), String> {
         let _ = app::start(text_cmd_rx, &app_rt);
     });
 
+    #[cfg(not(target_os = "macos"))]
     tray::init_blocking(settings);
+
+    #[cfg(target_os = "macos")]
+    {
+        // No tray yet: keep process alive while assistant + IPC threads run.
+        std::thread::park();
+    }
 
     Ok(())
 }

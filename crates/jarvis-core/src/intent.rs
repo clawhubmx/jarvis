@@ -40,6 +40,15 @@ pub async fn init(commands: &Vec<JCommandsList>) -> Result<(), String> {
     Ok(())
 }
 
+/// Refresh intent models after `COMMANDS_LIST` was updated on disk.
+pub async fn reload(commands: &[JCommandsList]) -> Result<(), String> {
+    match BACKEND.get().map(|s| s.as_str()).unwrap_or("none") {
+        "none" => Ok(()),
+        "intent-classifier" => intentclassifier::reload_training(commands).await,
+        _ => embeddingclassifier::reload(commands),
+    }
+}
+
 pub async fn classify(text: &str) -> Option<(String, f64)> {
     match BACKEND.get()?.as_str() {
         "none" => None,

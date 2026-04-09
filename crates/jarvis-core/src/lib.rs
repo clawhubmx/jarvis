@@ -61,7 +61,8 @@ pub static APP_DIRS: OnceCell<AppDirs> = OnceCell::new();
 pub static APP_CONFIG_DIR: OnceCell<PathBuf> = OnceCell::new();
 pub static APP_LOG_DIR: OnceCell<PathBuf> = OnceCell::new();
 pub static DB: OnceCell<Arc<RwLock<db::structs::Settings>>> = OnceCell::new();
-pub static COMMANDS_LIST: OnceCell<Vec<JCommandsList>> = OnceCell::new();
+/// Command packs from `resources/commands/`. Use `.read()` / `.write()` to access; reload updates in place.
+pub static COMMANDS_LIST: Lazy<RwLock<Vec<JCommandsList>>> = Lazy::new(|| RwLock::new(Vec::new()));
 
 // re-exports
 pub use commands::JCommandsList;

@@ -5,7 +5,7 @@
     import { setTimeout } from "worker-timers"
 
     import { showInExplorer } from "@/functions"
-    import { appInfo, assistantVoice, translations, translate } from "@/stores"
+    import { appInfo, assistantVoice, translations, translate, micMuted, setMuted, reloadCommands, ipcConnected } from "@/stores"
 
     import HDivider from "@/components/elements/HDivider.svelte"
     import Footer from "@/components/Footer.svelte"
@@ -294,6 +294,42 @@
                 {/if}
             </div>
         </div>
+
+        <Space h="lg" />
+        <HDivider />
+        <Space h="md" />
+
+        <InputWrapper label={t('settings-assistant-live')}>
+            <Text size="sm" color="gray">
+                {t('settings-assistant-live-desc')}
+            </Text>
+            <Space h="sm" />
+            <div class="assistant-live-actions">
+                <Button
+                    variant="light"
+                    color="gray"
+                    size="sm"
+                    uppercase
+                    disabled={!$ipcConnected}
+                    on:click={() => {
+                        const next = !$micMuted
+                        if (setMuted(next)) micMuted.set(next)
+                    }}
+                >
+                    {$micMuted ? t('settings-assistant-unmute') : t('settings-assistant-mute')}
+                </Button>
+                <Button
+                    variant="light"
+                    color="lime"
+                    size="sm"
+                    uppercase
+                    disabled={!$ipcConnected}
+                    on:click={() => reloadCommands()}
+                >
+                    {t('settings-assistant-reload-commands')}
+                </Button>
+            </div>
+        </InputWrapper>
     </Tabs.Tab>
 
     <Tabs.Tab label={t('settings-devices')} icon={Mix}>
@@ -615,5 +651,11 @@ $voice-max-visible: 3;
     font-size: 0.8rem;
     color: rgba(255,255,255,0.4);
     font-style: italic;
+}
+
+.assistant-live-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
 }
 </style>

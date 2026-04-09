@@ -1,4 +1,4 @@
-# JARVIS Voice Assistant (this readme is outdated)
+# JARVIS Voice Assistant
 
 ![We are NOT limited by the technology of our time!](poster.jpg)
 

@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+// WebSocket JSON schema: keep tag names and field names aligned with `frontend/src/lib/ipc.ts`
+// (`handleEvent` / `sendAction`). See also `design/ROADMAP.md` P1.4.
+
 // Events sent from jarvis-app to GUI
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
@@ -33,6 +36,12 @@ pub enum IpcEvent {
 
     // request GUI to reveal/focus window
     RevealWindow,
+
+    /// Mic listening muted or unmuted (wake word + voice commands paused when muted).
+    MicMuted { muted: bool },
+
+    /// Command packs were reloaded from disk (after successful parse + intent refresh).
+    CommandsReloaded { command_packs: usize },
 }
 
 // Actions sent from GUI to jarvis-app

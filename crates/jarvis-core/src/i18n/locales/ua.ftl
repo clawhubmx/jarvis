@@ -141,3 +141,9 @@ settings-gliner-models-hint = Моделі GLiNER не знайдено.
 search-error-not-running = Асистент не запущено
 search-error-failed = Не вдалося виконати команду
 settings-no-voices = Голоси не знайдено
+
+settings-assistant-live = Запущений асистент
+settings-assistant-live-desc = Потрібне підключення до асистента. Без звуку вимикаються пробудження та голосові команди (текстові в інтерфейсі працюють).
+settings-assistant-mute = Вимкнути прослуховування
+settings-assistant-unmute = Увімкнути прослуховування
+settings-assistant-reload-commands = Перезавантажити команди

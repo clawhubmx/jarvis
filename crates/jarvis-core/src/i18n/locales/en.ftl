@@ -141,3 +141,10 @@ settings-gliner-models-hint = No GLiNER models found.
 search-error-not-running = Assistant is not running
 search-error-failed = Failed to execute command
 settings-no-voices = No voices found
+
+# Assistant (IPC to running jarvis-app)
+settings-assistant-live = Running assistant
+settings-assistant-live-desc = Requires a connected assistant. Mute pauses wake word and voice commands (typed commands still work).
+settings-assistant-mute = Mute listening
+settings-assistant-unmute = Unmute listening
+settings-assistant-reload-commands = Reload commands
