@@ -51,6 +51,10 @@ Or run dev with `cargo tauri dev`.
 <br><br>
 *Thought you might need some of the platform specific libraries for [PvRecorder](https://github.com/Picovoice/pvrecorder) and [Vosk](https://github.com/alphacep/vosk-api).*
 
+### Note: Intel macOS (`x86_64-apple-darwin`) and ONNX
+
+The workspace pulls in **[`ort`](https://crates.io/crates/ort)** (ONNX Runtime) for embedding / GLiNER–style models. **`ort-sys` does not ship prebuilt binaries for the `x86_64-apple-darwin` target**, so `cargo build` / `cargo tauri build` may fail on Intel Macs with a build-script error from `ort-sys`. Options: build on **Apple Silicon** (`aarch64-apple-darwin`), use **Linux** or **Windows** where prebuilts exist, or follow the [`ort` linking docs](https://ort.pyke.io/setup/linking) to point at a self-built ONNX Runtime.
+
 ## Author
 
 Abraham Tugalov
